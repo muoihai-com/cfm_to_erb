@@ -1,3 +1,12 @@
+html, body, #root, .App, .Converter {
+  width: 100%;
+  height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -5,9 +14,42 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
 }
 
 code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.Converter {
+  flex-direction: column;
+  display: flex;
+}
+
+.Converter .cfm {
+  width: 50%;
+}
+
+.Converter .erb {
+  width: 50%;
+}
+
+.Converter .select {
+  padding: 1em;
+}
+
+.Converter .box {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.Converter .ta_cfm, .Converter .ta_erb {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  padding: 1em;
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
