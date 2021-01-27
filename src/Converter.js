@@ -1,22 +1,30 @@
 import React, { useState } from 'react';
-import cfmToErb from './lib';
+import cfmToErb from './cfmToErb';
+import cfmToRb from './cfmToRb';
+import cfquery from './cfquery';
 
 function Converter() {
   const [mode, setMode] = useState("erb");
-  const [erb, setErb] = useState("");
   const [cfm, setCfm] = useState("");
 
-  const bt = (t) => t.replaceAll("		", "  ");
+  const bt = (t) => t.replaceAll("	", "  ");
 
   const handleChangeTaCfm = (e) => {
     const text = e.target.value;
-    setCfm(bt(text));
-    setErb(cfmToErb(bt(text), mode));
+    setCfm(text);
   }
 
   const handleChangeSelect = (e) => {
     setMode(e.target.value);
-    setErb(cfmToErb(bt(cfm), e.target.value));
+  }
+
+  function convert_text(text) {
+    if(mode === "erb")
+      return bt(cfmToErb(text));
+    if(mode === "rb")
+      return bt(cfmToRb(text));
+    if(mode === "cfquery")
+      return bt(cfquery(text));
   }
 
   return (
@@ -25,6 +33,7 @@ function Converter() {
         <select value={mode} onChange={handleChangeSelect}>
           <option value="erb">Erb</option>
           <option value="rb">Rb</option>
+          <option value="cfquery">cfquery</option>
         </select>
       </div>
       <div className="box">
@@ -33,7 +42,7 @@ function Converter() {
           </textarea>
         </div>
         <div className="erb">
-          <textarea className="ta_erb" defaultValue={erb} placeholder={`${mode}...`}>
+          <textarea className="ta_erb" defaultValue={convert_text(cfm)} placeholder={`${mode}...`}>
           </textarea>
         </div>
       </div>
