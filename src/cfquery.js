@@ -1,25 +1,40 @@
 export default function cfquery(text) {
-  console.log(params);
   return flow([pre, parse, convert])(text);
 }
 
+var params;
 const SINGLE_TAGS = [
   "cfset", "cfcontinue", "cfelse", "cfelseif", "cfqueryparam", "cfparam", "cfbreak"
 ];
-
-var params = new Set();
 
 function flow(cbs) {
   return text => cbs.reduce((_, cb) => cb(_), text);
 }
 
 function pre(text) {
-  return text.replaceAll(/<cfqueryparam.*?value="#(\w+?)#".*?>/g, (match, p1) => {
-    params.add(p1);
-    return ":" + p1;
+  params = new Set();
+
+  return text.replaceAll(/<cfqueryparam.*?value="#([\w.]+?)#".*?>/g, (match, p1) => {
+    let name = p1.replaceAll(".", "_");
+    params.add(name);
+    return ":" + name;
   }).replaceAll(/<cfqueryparam cfsqltype="CF_SQL_TIMESTAMP" value="#Now\(\)#">/g, (match) => {
     params.add("time_zone_now");
     return ":time_zone_now";
+  }).replaceAll(/<cfqueryparam(.*?)>/g, (match, p1) => {
+    let type = p1.match(/cfsqltype="(.*?)"/);
+    let value = p1.match(/value="(.*?)"/);
+
+    if(!type || !value) return match;
+
+    switch (type[1]) {
+      case "CF_SQL_VARCHAR":
+        return value[1];
+      case "CF_SQL_INTEGER":
+        return value[1];
+      default:
+        return value[1];
+    }
   });
 }
 
@@ -73,7 +88,7 @@ function convert(node) {
 function convert_text(node){
   if(node.content.trim() === "") return "";
 
-  return `\tsql[0] += "${node.content.trim()}"\n`;
+  return `\tsql += "${node.content.trim()}"\n`;
 }
 
 function convert_cfif(node) {
@@ -83,7 +98,7 @@ function convert_cfif(node) {
 
   node.children.forEach(function(childNode) {
     if(childNode.name === "text") {
-      tmp += `sql[0] += "${childNode.content.trim()}"\n`;
+      tmp += `sql += "${childNode.content.trim()}"\n`;
     } else {
       tmp += convert(childNode);
     }
@@ -176,8 +191,8 @@ function convert_cfquery(node) {
   let tmp = `def ${match[1]}(${args.join(", ")})\n`;
 
   if(node.first().name === "text")
-    tmp += `\tsql[0] = "${node.first().content}"\n`;
-  else tmp += '\tsql[0] = ""\n';
+    tmp += `\tsql = "${node.first().content}"\n`;
+  else tmp += '\tsql = ""\n';
 
   node.children.forEach((childNode, index) => {
     if(childNode.name === "text" && index === 0) return;

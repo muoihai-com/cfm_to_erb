@@ -1,11 +1,9 @@
 export default function cfmToErb(text) {
-  console.log(parse(text));
-
-  return flow([parse, convert])(text);
+  return flow([parse, convert, remove_comment])(text);
 }
 
 const SINGLE_TAGS = [
-  "cfset", "cfcontinue", "cfelse", "cfelseif", "cfqueryparam", "cfparam", "cfbreak"
+  "cfset", "cfcontinue", "cfelse", "cfelseif", "cfqueryparam", "cfparam", "cfbreak", "cfinclude"
 ];
 
 function flow(cbs) {
@@ -67,6 +65,10 @@ function convert(node) {
       return convert_cfelseif(node);
     case 'cfset':
       return convert_cfset(node);
+    case 'cfbreak':
+      return '<% break %>';
+    case 'cfloop':
+      return convert_cfloop(node);
     default:
       return convert_default(node);
   }
@@ -114,7 +116,8 @@ function convert_cfif(node) {
 
   if(node.children.length === 1 &&
     node.first().name === "text" &&
-    node.first().content.length < 40) {
+    node.first().content.trim().length < 40 &&
+    node.first().content.trim().length > 0) {
 
     return tmp.replace("<% if", `<%= "${node.first().content}" if`);
   }
@@ -178,4 +181,22 @@ function convert_cfset(node) {
   return node.content.replaceAll(/<cfset ([\w.]+?) = ([\s\S]*?)>/g, (match, p1, p2) => {
     return `<% ${p1} = ${expression_in_tag(p2)} %>`;
   });
+}
+
+function convert_cfloop(node) {
+  let query = node.content.match(/query="(\w+?)"/);
+  if(!query) return node.content;
+
+  let tmp = `<% @${query[1]}.each do |${underscore(query[1])}| %>`
+  tmp += convert_root(node);
+  tmp += "<% end %>";
+  return tmp.replaceAll(query[1], underscore(query[1]));
+}
+
+function underscore(text) {
+  return text.replaceAll(/(?=.)([A-Z])/g, (match, p1) => `_${p1.toLowerCase()}`)
+}
+
+function remove_comment(text) {
+  return text.replaceAll(/<!---[\s\S]*?--->/g, "");
 }
