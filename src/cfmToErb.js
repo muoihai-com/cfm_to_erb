@@ -149,6 +149,7 @@ function expression_in_tag(text) {
     .replaceAll(/ and /gi, " && ")
     .replaceAll(/ or /gi, " || ")
     .replaceAll(/chkPermission\("([\w"]+)"\) (is|==) 1/g, 'chk_permission?("$1")')
+    .replaceAll(/IsNumeric\(([\w"]+?)\)/g, 'is_numeric?($1)')
     .replaceAll(/ == ""/g, ".blank?");
 }
 
