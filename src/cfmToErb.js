@@ -1,54 +1,11 @@
+import { SINGLE_TAGS, parse, expression_in_tag } from './lib';
+
 export default function cfmToErb(text) {
   return flow([parse, convert, remove_comment])(text);
 }
 
-const SINGLE_TAGS = [
-  "cfset", "cfcontinue", "cfelse", "cfelseif", "cfqueryparam", "cfparam", "cfbreak", "cfinclude"
-];
-
 function flow(cbs) {
   return text => cbs.reduce((_, cb) => cb(_), text);
-}
-
-function parse(text) {
-  const data = text.split(/(<cf[\s\S]+?>|<\/cf.*?>)/);
-  let root = new MyNode('root');
-
-  var parent = root;
-  data.forEach((t, index) => {
-    if(t.match(/<cf[\s\S]+?>/)) {
-      let match = t.match(/<(cf[a-z]+)[\s\S]*?>/);
-      if(match) {
-        const tag = new MyNode(match[1], match[0]);
-        parent.add(tag);
-        if(SINGLE_TAGS.includes(tag.name)) return;
-
-        parent = tag;
-      }
-    } else if (t.match(/<\/cf.*?>/)) {
-      let match = t.match(/<\/(cf.*?)>/);
-      if(match && match[1] === parent.name) parent = parent.parent;
-    } else {
-      parent.add(new MyNode('text', t))
-    }
-  });
-
-  return root;
-}
-
-function MyNode(name, content = "") {
-  this.name = name;
-  this.content = content;
-  this.children = [];
-
-  this.add = function(node) {
-    this.children.push(node);
-    node.parent = this;
-  }
-
-  this.first = function(node) {
-    return this.children[0];
-  }
 }
 
 function convert(node) {
@@ -79,7 +36,7 @@ function convert_text(node){
   text = text.replaceAll(/##/g, "==@@");
   if(!text.match(/#/)) return text.replaceAll("==@@", "#");
 
-  let arr = text.split(/(["#])/);
+  let arr = text.split(/(["#'])/);
 
   let begin = -1;
   let countA = 0;
@@ -100,7 +57,7 @@ function convert_text(node){
       continue;
     }
 
-    if(countA > 0 && arr[i] === '"') {
+    if(countA > 0 && (arr[i] === '"' || arr[i] === "'")) {
       countB += 1;
       continue;
     }
@@ -116,41 +73,16 @@ function convert_cfif(node) {
 
   if(node.children.length === 1 &&
     node.first().name === "text" &&
-    node.first().content.trim().length < 40 &&
+    node.first().content.trim().length < 50 &&
     node.first().content.trim().length > 0) {
 
-    return tmp.replace("<% if", `<%= "${node.first().content}" if`);
+    return tmp.replace("<% if", `<%= "${node.first().content.trim()}" if`);
   }
 
   tmp += convert_root(node);
   tmp += "<% end %>";
 
   return tmp;
-}
-
-function expression_in_tag(text) {
-  return text.trim()
-    .replaceAll(/is equal/gi, "==")
-    .replaceAll(/ eq /gi, " == ")
-    .replaceAll(/ is not /gi, " != ")
-    .replaceAll(/not equal/gi, "!=")
-    .replaceAll(/ neq /gi, " != ")
-    .replaceAll(/greater than/gi, ">")
-    .replaceAll(/ gt /gi, " > ")
-    .replaceAll(/less than/gi, "<")
-    .replaceAll(/ lt /gi, " < ")
-    .replaceAll(/greater than or equal to/gi, ">=")
-    .replaceAll(/ gte /gi, " >= ")
-    .replaceAll(/ ge /gi, " >= ")
-    .replaceAll(/less than or equal to/gi, "<=")
-    .replaceAll(/ lte /gi, " <= ")
-    .replaceAll(/ le /gi, " <= ")
-    .replaceAll(/ is /gi, " == ")
-    .replaceAll(/ and /gi, " && ")
-    .replaceAll(/ or /gi, " || ")
-    .replaceAll(/chkPermission\("([\w"]+)"\) (is|==) 1/g, 'chk_permission?("$1")')
-    .replaceAll(/IsNumeric\(([\w"]+?)\)/g, 'is_numeric?($1)')
-    .replaceAll(/ == ""/g, ".blank?");
 }
 
 function convert_root(node) {
@@ -185,13 +117,29 @@ function convert_cfset(node) {
 }
 
 function convert_cfloop(node) {
+  let index = node.content.match(/index="(\w+?)"/);
+  let from = node.content.match(/from="(\w+?)"/);
+  let to = node.content.match(/to="(\w+?)"/);
+  let step = node.content.match(/step="(\w+?)"/);
   let query = node.content.match(/query="(\w+?)"/);
-  if(!query) return node.content;
 
-  let tmp = `<% @${query[1]}.each do |${underscore(query[1])}| %>`
-  tmp += convert_root(node);
-  tmp += "<% end %>";
-  return tmp.replaceAll(query[1], underscore(query[1]));
+  if(query) {
+    let tmp = `<% @${query[1]}.each do |${underscore(query[1])}| %>`
+    tmp += convert_root(node);
+    tmp += "<% end %>";
+    return tmp.replaceAll(query[1], underscore(query[1]));
+  }
+
+
+  if(index && from && to) {
+    let tmp = `<% ${from[1]}.step(${to[1]}).each do |${index[1]}| %>`;
+    if(step) tmp = `<% ${from[1]}.step(${to[1]}, ${step[1]}).each do |${index[1]}| %>`
+    tmp += convert_root(node);
+    tmp += "<% end %>";
+    return tmp;
+  }
+
+  return convert_default(node);
 }
 
 function underscore(text) {
